@@ -22,7 +22,7 @@ public class GroupingLinesApp {
             countValueFrequencies(inputPath, valueFrequencies);
             valueFrequencies.entrySet().removeIf(entry -> entry.getValue() <= 1);
 
-            List<List<String>> groupedRows = collectRowData(inputPath, valueFrequencies);
+            List<Set<String>> groupedRows = collectRowData(inputPath, valueFrequencies);
             writeGroupedRowsToFile(outputPath, groupedRows);
 
             long endTime = System.currentTimeMillis();
@@ -59,7 +59,7 @@ public class GroupingLinesApp {
     }
 
     // Шаг 2: Сбор трок, принадлежащих потенциальным группам. Формирование групп.
-    private static List<List<String>> collectRowData(Path inputPath, Map<String, Integer> valueFrequencies) throws IOException {
+    private static List<Set<String>> collectRowData(Path inputPath, Map<String, Integer> valueFrequencies) throws IOException {
         List<String> filteredLines = new ArrayList<>();
         Map<String, List<Integer>> columnValueMap = new HashMap<>();
 
@@ -110,12 +110,16 @@ public class GroupingLinesApp {
             groups.computeIfAbsent(root, k -> new ArrayList<>()).add(i);
         }
 
-        List<List<String>> resultGroups = new ArrayList<>();
+        List<Set<String>> resultGroups = new ArrayList<>();
         for (List<Integer> group : groups.values()) {
             if (group.size() > 1) {
-                List<String> lines = new ArrayList<>();
-                for (int index : group) lines.add(filteredLines.get(index));
-                resultGroups.add(lines);
+                Set<String> lines = new HashSet<>();
+                for (int index : group){
+                    lines.add(filteredLines.get(index));
+                }
+                if(lines.size() > 1) {
+                    resultGroups.add(lines);
+                }
             }
         }
 
@@ -124,7 +128,7 @@ public class GroupingLinesApp {
     }
 
     // Шаг 3: Запись результата в файл
-    private static void writeGroupedRowsToFile(Path outputPath, List<List<String>> groupedRows) throws IOException {
+    private static void writeGroupedRowsToFile(Path outputPath, List<Set<String>> groupedRows) throws IOException {
         try (BufferedWriter writer = Files.newBufferedWriter(outputPath)) {
             writer.write("Найдено групп с более чем одним элементом: " + groupedRows.size());
             writer.newLine();
@@ -150,13 +154,25 @@ public class GroupingLinesApp {
         int i = 0, n = line.length();
 
         while (i < n) {
-            if (line.charAt(i) != '"') return null;
+            if (line.charAt(i) != '"'){
+                return null;
+            }
+
             int j = i + 1;
-            while (j < n && line.charAt(j) != '"') j++;
-            if (j >= n) return null;
+            while (j < n && line.charAt(j) != '"'){
+                j++;
+            }
+
+            if (j >= n){
+                return null;
+            }
+
             tokens.add(line.substring(i + 1, j));
             i = j + 1;
-            if (i < n && line.charAt(i) == ';') i++;
+
+            if (i < n && line.charAt(i) == ';'){
+                i++;
+            }
         }
 
         return tokens.toArray(new String[0]);
