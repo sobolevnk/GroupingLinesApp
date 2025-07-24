@@ -22,7 +22,7 @@ public class GroupingLinesApp {
             countValueFrequencies(inputPath, valueFrequencies);
             valueFrequencies.entrySet().removeIf(entry -> entry.getValue() <= 1);
 
-            List<Set<String>> groupedRows = collectRowData(inputPath, valueFrequencies);
+            List<List<String>> groupedRows = collectRowData(inputPath, valueFrequencies);
             writeGroupedRowsToFile(outputPath, groupedRows);
 
             long endTime = System.currentTimeMillis();
@@ -59,9 +59,11 @@ public class GroupingLinesApp {
     }
 
     // Шаг 2: Сбор трок, принадлежащих потенциальным группам. Формирование групп.
-    private static List<Set<String>> collectRowData(Path inputPath, Map<String, Integer> valueFrequencies) throws IOException {
-        List<String> filteredLines = new ArrayList<>();
+    private static List<List<String>> collectRowData(Path inputPath, Map<String, Integer> valueFrequencies) throws IOException {
+        List<String> uniqueLines = new ArrayList<>();
+        Map<String, Integer> lineToIndex = new HashMap<>();
         Map<String, List<Integer>> columnValueMap = new HashMap<>();
+        List<Integer> lineOfUniqueIndices = new ArrayList<>();
 
         try (BufferedReader reader = Files.newBufferedReader(inputPath)) {
             String line;
@@ -89,13 +91,17 @@ public class GroupingLinesApp {
                 }
 
                 if (isRelevant) {
-                    filteredLines.add(line);
+                    if (!lineToIndex.containsKey(line)) {
+                        lineToIndex.put(line, uniqueLines.size());
+                        uniqueLines.add(line);
+                    }
+                    lineOfUniqueIndices.add(lineToIndex.get(line));
                     rowIndex++;
                 }
             }
         }
 
-        int totalRows = filteredLines.size();
+        int totalRows = lineOfUniqueIndices.size();
         UnionFind uf = new UnionFind(totalRows);
 
         for (List<Integer> indices : columnValueMap.values()) {
@@ -104,22 +110,20 @@ public class GroupingLinesApp {
             }
         }
 
-        Map<Integer, List<Integer>> groups = new HashMap<>();
+        Map<Integer, Set<Integer>> groups = new HashMap<>();
         for (int i = 0; i < totalRows; i++) {
             int root = uf.find(i);
-            groups.computeIfAbsent(root, k -> new ArrayList<>()).add(i);
+            groups.computeIfAbsent(root, k -> new HashSet<>()).add(lineOfUniqueIndices.get(i));
         }
 
-        List<Set<String>> resultGroups = new ArrayList<>();
-        for (List<Integer> group : groups.values()) {
+        List<List<String>> resultGroups = new ArrayList<>();
+        for (Set<Integer> group : groups.values()) {
             if (group.size() > 1) {
-                Set<String> lines = new HashSet<>();
-                for (int index : group){
-                    lines.add(filteredLines.get(index));
+                List<String> lines = new ArrayList<>();
+                for (int index : group) {
+                    lines.add(uniqueLines.get(index));
                 }
-                if(lines.size() > 1) {
-                    resultGroups.add(lines);
-                }
+                resultGroups.add(lines);
             }
         }
 
@@ -128,7 +132,7 @@ public class GroupingLinesApp {
     }
 
     // Шаг 3: Запись результата в файл
-    private static void writeGroupedRowsToFile(Path outputPath, List<Set<String>> groupedRows) throws IOException {
+    private static void writeGroupedRowsToFile(Path outputPath, List<List<String>> groupedRows) throws IOException {
         try (BufferedWriter writer = Files.newBufferedWriter(outputPath)) {
             writer.write("Найдено групп с более чем одним элементом: " + groupedRows.size());
             writer.newLine();
@@ -154,6 +158,14 @@ public class GroupingLinesApp {
         int i = 0, n = line.length();
 
         while (i < n) {
+            if(line.charAt(i) == ';'){
+                if (i == 0 || line.charAt(i-1) == ';'){
+                    i++;
+                    tokens.add("");
+                    continue;
+                }
+            }
+
             if (line.charAt(i) != '"'){
                 return null;
             }
@@ -184,18 +196,24 @@ public class GroupingLinesApp {
 
         UnionFind(int size) {
             parent = new int[size];
-            for (int i = 0; i < size; i++) parent[i] = i;
+            for (int i = 0; i < size; i++){
+                parent[i] = i;
+            }
         }
 
         int find(int x) {
-            if (parent[x] != x) parent[x] = find(parent[x]);
+            if (parent[x] != x){
+                parent[x] = find(parent[x]);
+            }
             return parent[x];
         }
 
         void union(int a, int b) {
             int rootA = find(a);
             int rootB = find(b);
-            if (rootA != rootB) parent[rootB] = rootA;
+            if (rootA != rootB){
+                parent[rootB] = rootA;
+            }
         }
     }
 }
