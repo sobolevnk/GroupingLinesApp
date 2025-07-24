@@ -91,11 +91,13 @@ public class GroupingLinesApp {
                 }
 
                 if (isRelevant) {
-                    if (!lineToIndex.containsKey(line)) {
-                        lineToIndex.put(line, uniqueLines.size());
+                    Integer index = lineToIndex.get(line);
+                    if (index == null) {
+                        index = uniqueLines.size();
+                        lineToIndex.put(line, index);
                         uniqueLines.add(line);
                     }
-                    lineOfUniqueIndices.add(lineToIndex.get(line));
+                    lineOfUniqueIndices.add(index);
                     rowIndex++;
                 }
             }
@@ -154,40 +156,57 @@ public class GroupingLinesApp {
 
     // Разбор строки: элементы заключены в кавычки и разделены ;
     private static String[] parseFileLine(String line) {
-        List<String> tokens = new ArrayList<>();
-        int i = 0, n = line.length();
+        int n = line.length();
+        int i = 0;
+        int estimatedTokens = 1;
+        for (int k = 0; k < n; k++) {
+            if (line.charAt(k) == ';') estimatedTokens++;
+        }
+
+        String[] result = new String[estimatedTokens];
+        int tokenIndex = 0;
 
         while (i < n) {
-            if(line.charAt(i) == ';'){
-                if (i == 0 || line.charAt(i-1) == ';'){
-                    i++;
-                    tokens.add("");
-                    continue;
+            // Пустое значение в начале или между ;;
+            if (line.charAt(i) == ';') {
+                if (i == 0 || line.charAt(i - 1) == ';') {
+                    result[tokenIndex++] = "";
                 }
+                i++;
+                continue;
             }
 
-            if (line.charAt(i) != '"'){
+            // Значение должно быть обёрнуто в кавычки
+            if (line.charAt(i) != '"') {
                 return null;
             }
 
             int j = i + 1;
-            while (j < n && line.charAt(j) != '"'){
+            while (j < n && line.charAt(j) != '"') {
                 j++;
             }
 
-            if (j >= n){
+            if (j >= n) {
                 return null;
             }
 
-            tokens.add(line.substring(i + 1, j));
+            result[tokenIndex++] = line.substring(i + 1, j);
             i = j + 1;
 
-            if (i < n && line.charAt(i) == ';'){
+            if (i < n && line.charAt(i) == ';') {
                 i++;
             }
         }
 
-        return tokens.toArray(new String[0]);
+        if (n > 0 && line.charAt(n - 1) == ';') {
+            result[tokenIndex++] = "";
+        }
+
+        if (tokenIndex != result.length) {
+            return Arrays.copyOf(result, tokenIndex);
+        }
+
+        return result;
     }
 
     // Класс Union-Find (Disjoint Set Union)
